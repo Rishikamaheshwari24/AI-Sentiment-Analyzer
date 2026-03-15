@@ -3,6 +3,16 @@
 AI Sentiment Analyzer that converts speech to text and detects sentiment (positive, negative, or neutral) using AI and NLP techniques.
 =======
 ---
+title: VoiceSense AI
+emoji: 🎤
+colorFrom: blue
+colorTo: green
+sdk: gradio
+python_version: "3.10"
+app_file: app.py
+pinned: false
+---
+---
 title: AI Sentiment Analyzer
 emoji: 🐨
 colorFrom: gray
