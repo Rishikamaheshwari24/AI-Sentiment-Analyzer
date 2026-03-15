@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VoiceSense AI</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+/* Background */
+
+body{
+margin:0;
+font-family: 'Segoe UI', sans-serif;
+background: linear-gradient(135deg,#0f172a,#020617,#1e293b);
+color:white;
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+/* Container */
+
+.main-container{
+width:900px;
+padding:40px;
+border-radius:20px;
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(20px);
+box-shadow:0 20px 50px rgba(0,0,0,0.6);
+}
+
+/* Header */
+
+.title{
+font-size:40px;
+text-align:center;
+font-weight:700;
+background:linear-gradient(90deg,#22c55e,#06b6d4,#6366f1);
+-webkit-background-clip:text;
+color:transparent;
+margin-bottom:20px;
+}
+
+/* Upload */
+
+.upload-box{
+border:2px dashed #64748b;
+padding:30px;
+border-radius:12px;
+text-align:center;
+margin-bottom:20px;
+}
+
+/* Buttons */
+
+button{
+padding:12px 24px;
+margin:10px;
+border:none;
+border-radius:10px;
+background:linear-gradient(135deg,#22c55e,#4ade80);
+color:white;
+font-size:15px;
+cursor:pointer;
+transition:0.3s;
+}
+
+button:hover{
+transform:scale(1.05);
+box-shadow:0 0 15px #22c55e;
+}
+
+/* Audio player */
+
+audio{
+margin-top:20px;
+width:100%;
+}
+
+/* Results */
+
+.results{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+margin-top:20px;
+}
+
+.card{
+background:rgba(0,0,0,0.4);
+padding:20px;
+border-radius:12px;
+}
+
+.card h3{
+margin-top:0;
+}
+
+/* Chart */
+
+canvas{
+margin-top:20px;
+}
+
+.footer{
+text-align:center;
+margin-top:20px;
+color:#94a3b8;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="main-container">
+
+<div class="title">🎤 VoiceSense AI</div>
+
+<div class="upload-box">
+<input type="file" id="audioFile">
+<br>
+<button onclick="uploadAudio()">Analyse Audio</button>
+</div>
+
+<div style="text-align:center">
+
+<button onclick="startRecording()">Start Recording</button>
+<button onclick="stopRecording()">Stop Recording</button>
+
+</div>
+
+<audio id="player" controls></audio>
+
+<div class="results">
+
+<div class="card">
+<h3>Transcript</h3>
+<p id="transcript">Waiting for audio...</p>
+</div>
+
+<div class="card">
+<h3>Sentiment</h3>
+<p id="sentiment">---</p>
+</div>
+
+<div class="card">
+<h3>AI Insights</h3>
+<p id="insight">---</p>
+</div>
+
+<div class="card">
+<h3>Confidence</h3>
+<p id="confidence">---</p>
+</div>
+
+</div>
+
+<canvas id="chart"></canvas>
+
+<div class="footer">
+Powered by AI Speech Intelligence
+</div>
+
+</div>
+
+<script>
+
+let recorder
+let audioBlob
+
+async function startRecording(){
+
+const stream = await navigator.mediaDevices.getUserMedia({audio:true})
+
+recorder = new MediaRecorder(stream)
+
+let chunks=[]
+
+recorder.ondataavailable = e => chunks.push(e.data)
+
+recorder.onstop = e=>{
+
+audioBlob = new Blob(chunks,{type:'audio/wav'})
+document.getElementById("player").src = URL.createObjectURL(audioBlob)
+
+}
+
+recorder.start()
+
+}
+
+function stopRecording(){
+
+recorder.stop()
+
+}
+
+function uploadAudio(){
+
+let fileInput = document.getElementById("audioFile")
+
+let formData = new FormData()
+
+if(audioBlob){
+formData.append("audio",audioBlob,"recording.wav")
+}
+else{
+formData.append("audio",fileInput.files[0])
+}
+
+fetch("/analyse",{
+method:"POST",
+body:formData
+})
+
+.then(res=>res.json())
+
+.then(data=>{
+
+document.getElementById("transcript").innerText = data.transcript
+
+document.getElementById("sentiment").innerText = data.sentiment
+
+document.getElementById("confidence").innerText = data.score + "%"
+
+document.getElementById("insight").innerText =
+"AI detected a " + data.sentiment + " tone."
+
+updateChart(data.sentiment,data.score)
+
+})
+
+}
+
+function updateChart(label,score){
+
+const ctx=document.getElementById("chart")
+
+new Chart(ctx,{
+type:'doughnut',
+data:{
+labels:[label,"Remaining"],
+datasets:[{
+data:[score,100-score]
+}]
+}
+})
+
+}
+
+</script>
+
+</body>
+</html>
