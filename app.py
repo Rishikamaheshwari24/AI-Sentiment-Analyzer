@@ -1,46 +1,23 @@
-from flask import Flask, render_template, request, jsonify
+import gradio as gr
 import whisper
 from transformers import pipeline
-import os
 
-app = Flask(__name__)
-
-print("Loading models...")
-
+# Load models
 whisper_model = whisper.load_model("base")
 sentiment_model = pipeline("sentiment-analysis")
 
-print("Models loaded successfully")
-
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-@app.route("/")
-def home():
-    return render_template("index.html")
-
-@app.route("/analyse", methods=["POST"])
-def analyse():
-
-    if "audio" not in request.files:
-        return jsonify({"error":"No audio uploaded"})
-
-    audio_file = request.files["audio"]
-    path = os.path.join(UPLOAD_FOLDER, audio_file.filename)
-    audio_file.save(path)
-
-    # Speech to text
-    result = whisper_model.transcribe(path)
+def analyse_audio(audio_file):
+    # audio_file is path
+    result = whisper_model.transcribe(audio_file)
     text = result["text"]
-
-    # Sentiment
     sentiment = sentiment_model(text)[0]
+    return text, sentiment["label"], round(sentiment["score"]*100, 2)
 
-    return jsonify({
-        "transcript": text,
-        "sentiment": sentiment["label"],
-        "score": round(sentiment["score"]*100,2)
-    })
-
-if __name__ == "__main__":
-    app.run(debug=True)
+# Gradio interface
+gr.Interface(
+    fn=analyse_audio,
+    inputs=gr.Audio(source="upload", type="filepath"),
+    outputs=["text", "text", "number"],
+    title="AI Speech Sentiment Analyzer",
+    description="Upload an audio file to analyze sentiment"
+).launch()
