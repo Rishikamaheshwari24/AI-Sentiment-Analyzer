@@ -1,64 +1,46 @@
+from flask import Flask, render_template, request, jsonify
+import whisper
 from transformers import pipeline
-import gradio as gr
-import speech_recognition as sr
+import os
 
-# -------------------------
-# Load your AI model
-# -------------------------
-classifier = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+app = Flask(__name__)
 
-# -------------------------
-# Text sentiment function
-# -------------------------
-def analyze_text(text):
-    if not text:
-        return "Please enter some text."
-    result = classifier(text)[0]
-    return f"Label: {result['label']}, Score: {result['score']:.2f}"
+print("Loading models...")
 
-# -------------------------
-# Audio sentiment function
-# -------------------------
-def analyze_audio(audio_file):
-    if not audio_file:
-        return "Please upload an audio file."
-    
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_file) as source:
-        audio_data = recognizer.record(source)
-        try:
-            text = recognizer.recognize_google(audio_data)
-        except sr.UnknownValueError:
-            return "Could not understand the audio."
-        except sr.RequestError:
-            return "Speech Recognition service error."
-    
-    result = classifier(text)[0]
-    return f"Transcribed Text: {text}\nLabel: {result['label']}, Score: {result['score']:.2f}"
+whisper_model = whisper.load_model("base")
+sentiment_model = pipeline("sentiment-analysis")
 
-# -------------------------
-# Build Gradio interface
-# -------------------------
-text_interface = gr.Interface(
-    fn=analyze_text,
-    inputs=gr.Textbox(lines=5, placeholder="Enter your text here..."),
-    outputs="text",
-    title="AI Sentiment Analyzer (Text)",
-    description="Enter text to detect sentiment."
-)
+print("Models loaded successfully")
 
-audio_interface = gr.Interface(
-    fn=analyze_audio,
-    inputs=gr.Audio(source="upload", type="filepath"),
-    outputs="text",
-    title="AI Sentiment Analyzer (Audio)",
-    description="Upload an audio file to detect sentiment."
-)
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Combine both tabs
-app = gr.TabbedInterface([text_interface, audio_interface], ["Text", "Audio"])
+@app.route("/")
+def home():
+    return render_template("index.html")
 
-# -------------------------
-# Launch app
-# -------------------------
-app.launch()
+@app.route("/analyse", methods=["POST"])
+def analyse():
+
+    if "audio" not in request.files:
+        return jsonify({"error":"No audio uploaded"})
+
+    audio_file = request.files["audio"]
+    path = os.path.join(UPLOAD_FOLDER, audio_file.filename)
+    audio_file.save(path)
+
+    # Speech to text
+    result = whisper_model.transcribe(path)
+    text = result["text"]
+
+    # Sentiment
+    sentiment = sentiment_model(text)[0]
+
+    return jsonify({
+        "transcript": text,
+        "sentiment": sentiment["label"],
+        "score": round(sentiment["score"]*100,2)
+    })
+
+if __name__ == "__main__":
+    app.run(debug=True)
